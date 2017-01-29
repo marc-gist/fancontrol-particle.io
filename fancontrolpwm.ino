@@ -5,7 +5,7 @@
 // This #include statement was automatically added by the Particle IDE.
 #include "FreqPeriodCounter.h"
 
-#define tempPin D2 // one wire pin; could use multiple in order to easily determine temp inputs
+#define tempPin D4 // one wire pin; could use multiple in order to easily determine temp inputs
 
 long previousMillis = 0;
 long interval = 2000;
@@ -15,27 +15,35 @@ boolean button_was_pressed;
 unsigned long pulseDuration;
 unsigned long millisNow = 0;
 #define rpmCalcDelay            2500
-int fanRPM = 0;
 
 
-#define pulsePin D5
-#define pulsePin2 D6
-const int counter_interrupt_pin = pulsePin; // aka pulsePin
+#define pwmFan D2
+#define pwmFan2 D3
+#define pwmFan3 RX
+#define pwmFan4 TX
+
+#define rpmPin A0
+#define rpmPin2 A1
+#define rpmPin3 A2
+const int counter_interrupt_pin = rpmPin; // aka rpmPin
 
 const int k_seconds_per_minute = 60;
 const int k_pulses_per_revolution = 2;
 const int k_hertz_to_RPM_conversion_factor = k_seconds_per_minute / k_pulses_per_revolution;
 
+Timer getTempTimer(5000, getTemp);
+
 void setup() {
-    pinMode(D3, OUTPUT);
+    pinMode(pwmFan4, OUTPUT);
     ow_setPin(tempPin);
-    pinMode(pulsePin, INPUT_PULLUP);
-    pinMode(pulsePin2, INPUT_PULLUP);
+    pinMode(rpmPin, INPUT_PULLUP);
+    pinMode(rpmPin2, INPUT_PULLUP);
     pinMode(A3, INPUT);
 
     Serial.begin(9600);
     delay(2000);
     Serial.println("OK");
+    getTempTimer.start();
 }
 
 uint8_t sensors[80];
@@ -138,24 +146,23 @@ void counter_interrupt_service_routine()
     counter.poll();
 }
 
-
 void loop() {
     delay(interval);
 
 
     int v = analogRead(A3);
     v = v/16;
-    if( v < 85 ) v = 85;
+    if( v < 35 ) v = 35;
     if( v > 250) v = 250;
-    analogWrite(D3, v, 25000);
+    analogWrite(pwmFan4, v, 25000);
 
     Serial.print("A: ");
     Serial.println(v/250.0*100.0);
 
     Serial.print("RPM:");
-    counter_read_rpm(pulsePin);
+    counter_read_rpm(rpmPin);
     delay(500);
-    //counter_read_rpm(pulsePin2);
-    // Serial.println(fanRPM);
-    getTemp();
+    //counter_read_rpm(rpmPin2);
+
+    //getTemp() will fire by timers.
 }
