@@ -211,12 +211,13 @@ void loop() {
     //Serial.print("RPM:");
 
     getTemp(); // also can enable timers.
-
-    // TODO: check return values
-    for(i = 0; i < num; i++) {
+        
+    // this is working, so start skipping so we can do other work
+    /*for(i = 0; i < num; i++) {
       counter_read_rpm(rpmPins[i]);
+      // TODO: check return values, and alert if issue?
       delay(250);
-    }
+    }*/
 
 
     Serial.println("DELAY");
