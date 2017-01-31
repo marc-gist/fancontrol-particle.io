@@ -1,5 +1,4 @@
 // This #include statement was automatically added by the Particle IDE.
-#include <map>
 #include "ds18x20.h"
 #include "onewire.h"
 
@@ -13,7 +12,8 @@ long interval = 5000;
 boolean button_was_pressed;
 unsigned long pulseDuration;
 unsigned long millisNow = 0;
-#define rpmCalcDelay            2500
+
+boolean fanChanged = true;
 
 /*#define pwmFan D2
 #define pwmFan2 D3
@@ -44,9 +44,11 @@ const int k_seconds_per_minute = 60;
 const int k_pulses_per_revolution = 2;
 const int k_hertz_to_RPM_conversion_factor = k_seconds_per_minute / k_pulses_per_revolution;
 
-Timer getTempTimer(5000, getTemp);
+// Timer getTempTimer(5000, getTemp);
 
 void setup() {
+    Particle.function("setrpm", setRpm);
+    Particle.function("gettemp", getTempApi);
     for(int i=0; i<num; i++) {
       pinMode(pwmFans[i], OUTPUT);
       pinMode(rpmPins[i], INPUT_PULLUP);
@@ -58,7 +60,7 @@ void setup() {
     pinMode(A4, INPUT); //testing pin, used for variable resistor
 
     Serial.begin(9600);
-    Particle.publish("fan-mon", "init");
+    //Particle.publish("fan-mon", "init");
     delay(2000);
     Serial.println("OK");
 
@@ -70,12 +72,17 @@ void log(char* msg)
 {
     //Particle.publish("log", msg);
     Serial.println(msg);
-    delay(500);
+    delay(100);
 }
 
 
 double tempArry[4];
 static constexpr int sensorTemp[] = {62, 97, 191, 194};
+
+int getTempApi(String args) {
+  int i = args.toInt();
+  return tempArry[i]*1000;
+}
 
 void getTemp() {
     double retval = 0;
@@ -100,6 +107,8 @@ void getTemp() {
 				char sign = (subzero) ? '-' : '+';
 				int frac = cel_frac_bits*DS18X20_FRACCONV;
         int item = -1;
+
+        // this gets the entire address of the chip
 				/*sprintf(msg, "Sensor# %d (%02X%02X%02X%02X%02X%02X%02X%02X) =  : %c%d.%04d\r\n",i+1,
 				sensors[(i*OW_ROMCODE_SIZE)+0],
 				sensors[(i*OW_ROMCODE_SIZE)+1],
@@ -113,6 +122,7 @@ void getTemp() {
 				cel,
 				frac
 				);*/
+
         sprintf(msg, "Sensor# %d (%02X %d) =  : %c%d.%04d\r\n",i+1,
         sensors[(i*OW_ROMCODE_SIZE)+0],
 				sensors[(i*OW_ROMCODE_SIZE)+7],
@@ -127,6 +137,8 @@ void getTemp() {
         retval = ((cel*10000)+frac) / 10000.0;
         if(subzero) retval *= -1;
 
+        // store according to maped codes based upon just last byte of address
+        // TODO: make this programable from web interface?
         switch(sensors[(i*OW_ROMCODE_SIZE)+7]) {
           case sensorTemp[0]:
             item = 0;
@@ -147,7 +159,7 @@ void getTemp() {
 			}
 			else
 			{
-			    Spark.publish("log", "CRC Error (lost connection?)");
+			    log("CRC Error (lost connection?)");
 			}
         }
     }
@@ -211,7 +223,7 @@ void loop() {
     //Serial.print("RPM:");
 
     getTemp(); // also can enable timers.
-        
+
     // this is working, so start skipping so we can do other work
     /*for(i = 0; i < num; i++) {
       counter_read_rpm(rpmPins[i]);
@@ -223,17 +235,46 @@ void loop() {
     Serial.println("DELAY");
     delay(interval);
 
+    // int v = analogRead(A4);
+    // v = v/16;
+    // if( v < 35 ) v = 35;
+    // if( v > 250) v = 250;
 
-    int v = analogRead(A4);
-    v = v/16;
-    if( v < 35 ) v = 35;
-    if( v > 250) v = 250;
+    // Serial.print("A: ");
+    // Serial.println(v/252.0*100.0);
 
-    Serial.print("A: ");
-    Serial.println(v/252.0*100.0);
+    // for(i=0; i<num; i++) {
+    //   analogWrite(pwmFans[i], v, PWM_FREQ);
+    // }
 
-    for(i=0; i<num; i++) {
-      analogWrite(pwmFans[i], v, PWM_FREQ);
+
+
+}
+
+int setRpm(String args) {
+    int pos = args.indexOf('=');
+    if( pos == -1 ) return -2;
+    String fan_s = args.substring(0, pos);
+    String val_s = args.substring(pos+1);
+    Serial.printlnf("fan_s: %s", fan_s.c_str());
+    Serial.printlnf("val_s: %s", val_s.c_str());
+    int fan = fan_s.toInt();
+    int val = val_s.toInt();
+    if( fan == num ) {
+      for(int i=0; i<num; i++) {
+        analogWrite(pwmFans[i], val);
+      }
+      return num;
+    } else if( fan < 0 || fan > num ) {
+      return -3;
+    } else {
+      if( val > 35 && val < 255 )
+        analogWrite(pwmFans[fan], val);
+      else
+        return -1;
+
+      delay(2000);
+      return counter_read_rpm(rpmPins[fan]);
     }
-
+    return -5;
 }
