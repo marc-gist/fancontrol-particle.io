@@ -28,8 +28,14 @@ boolean fanChanged = true;
 #define tempPin D4 // one wire pin; could use multiple in order to easily determine temp inputs
 
 const int num = 4; // NUMBER OF FANS? CONNECTED
-const int pwmFans[] = {D2, D3, RX, TX};
+const int pwmFans[] = {RX, TX, D2, D3};
 const int rpmPins[] = {A0, A1, A2, A3};
+
+// use to auto change fan?
+bool doFanAutoTempChange = true;
+double lowTemp[] = {30.0, 30.0, 30.0, 30.0};
+double highTemp[] = {48.0, 48.0, 48.0, 48.0};
+bool tempChange[] = {true, true, true, true}; // change fan with temp?
 
 const int rpmLow = 80; // ~30%
 const int rpmMed = 128; // ~50%
@@ -38,17 +44,45 @@ const int rpmMax = 252; // ~100% (put slightly lower in order to pwm?)
 
 #define PWM_FREQ 25000
 
+double tempArry[4];
+static constexpr int sensorTemp[] = {62, 97, 191, 194};
+
 //const int counter_interrupt_pin = rpmPin; // aka rpmPin
 
 const int k_seconds_per_minute = 60;
 const int k_pulses_per_revolution = 2;
 const int k_hertz_to_RPM_conversion_factor = k_seconds_per_minute / k_pulses_per_revolution;
+String tempString = String("Call gettemp first");
 
 // Timer getTempTimer(5000, getTemp);
+
+int tempChangeCheck() {
+  if( !doFanAutoTempChange ) return 0;
+  for(int i = 0; i < num; i++) {
+    if(tempArry[i] > 20 ) {
+      if(tempArry[i] >= highTemp[i] && tempChange[i]) {
+        Serial.printlnf("Fan %d set to High", i);
+        analogWrite(pwmFans[i], rpmHigh, PWM_FREQ);
+      } else
+      if(tempArry[i] > lowTemp[i] && tempChange[i]) {
+        Serial.printlnf("Fan %d set to Med", i);
+        analogWrite(pwmFans[i], rpmMed, PWM_FREQ);
+      } else {
+        Serial.printlnf("Fan %d set to Low", i);
+        analogWrite(pwmFans[i], rpmLow, PWM_FREQ);
+      }
+    }
+  }
+
+  return 1;
+}
+
 
 void setup() {
     Particle.function("setrpm", setRpm);
     Particle.function("gettemp", getTempApi);
+    Particle.function("scantemp", getTemp);
+    Particle.variable("temps", tempString);
     for(int i=0; i<num; i++) {
       pinMode(pwmFans[i], OUTPUT);
       pinMode(rpmPins[i], INPUT_PULLUP);
@@ -76,15 +110,15 @@ void log(char* msg)
 }
 
 
-double tempArry[4];
-static constexpr int sensorTemp[] = {62, 97, 191, 194};
-
+//return the integer value of the temp for args=0-num
+//will be 1000x to keep decimals, need to devide by 1000 to get float value again
 int getTempApi(String args) {
   int i = args.toInt();
   return tempArry[i]*1000;
 }
 
-void getTemp() {
+// scan bus for DS18x20's and store in tempArry[]
+int getTemp(String args) {
     double retval = 0;
     uint8_t subzero, cel, cel_frac_bits;
     char msg[100];
@@ -124,11 +158,11 @@ void getTemp() {
 				);*/
 
         sprintf(msg, "Sensor# %d (%02X %d) =  : %c%d.%04d\r\n",i+1,
-        sensors[(i*OW_ROMCODE_SIZE)+0],
-				sensors[(i*OW_ROMCODE_SIZE)+7],
-				sign,
-				cel,
-				frac
+          sensors[(i*OW_ROMCODE_SIZE)+0],
+				  sensors[(i*OW_ROMCODE_SIZE)+7],
+				  sign,
+				  cel,
+				  frac
 				);
 				log(msg);
 
@@ -147,22 +181,26 @@ void getTemp() {
             item = 1;
             break;
           case sensorTemp[2]:
-              item = 2;
-              break;
+            item = 2;
+            break;
           case sensorTemp[3]:
-                item = 3;
-                break;
+            item = 3;
+            break;
         }
-        Serial.printf("float %d: ", item);
+        //Serial.printf("float %d: ", item);
         tempArry[item] = retval;
-        Serial.println(retval);
+        //Serial.println(retval);
 			}
 			else
 			{
 			    log("CRC Error (lost connection?)");
 			}
         }
-    }
+    }//end for
+    tempString = String::format("[%.3f, %.3f, %.3f, %.3f]",
+      tempArry[0], tempArry[1], tempArry[2], tempArry[3]);
+
+    return 1;
 }
 
 // setup global, pass first rpmPin here just to setup, will override in function
@@ -222,7 +260,7 @@ void loop() {
 
     //Serial.print("RPM:");
 
-    getTemp(); // also can enable timers.
+    getTemp("all"); // also can enable timers.
 
     // this is working, so start skipping so we can do other work
     /*for(i = 0; i < num; i++) {
@@ -251,6 +289,12 @@ void loop() {
 
 }
 
+/*
+* used to set the RPM (PWM 0-250) on a pin
+* syntax would be '<FAN>=<PWM>'
+* 0=250
+* would set pwmFans[0] pin to 250 PWM duty cycle (approx 100%)
+*/
 int setRpm(String args) {
     int pos = args.indexOf('=');
     if( pos == -1 ) return -2;
@@ -262,14 +306,14 @@ int setRpm(String args) {
     int val = val_s.toInt();
     if( fan == num ) {
       for(int i=0; i<num; i++) {
-        analogWrite(pwmFans[i], val);
+        analogWrite(pwmFans[i], val, PWM_FREQ);
       }
       return num;
     } else if( fan < 0 || fan > num ) {
       return -3;
     } else {
       if( val > 35 && val < 255 )
-        analogWrite(pwmFans[fan], val);
+        analogWrite(pwmFans[fan], val, PWM_FREQ);
       else
         return -1;
 
