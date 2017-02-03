@@ -13,18 +13,6 @@ boolean button_was_pressed;
 unsigned long pulseDuration;
 unsigned long millisNow = 0;
 
-boolean fanChanged = true;
-
-/*#define pwmFan D2
-#define pwmFan2 D3
-#define pwmFan3 RX
-#define pwmFan4 TX
-
-#define rpmPin A0
-#define rpmPin2 A1
-#define rpmPin3 A2
-#define rpmPin4 A3*/
-
 #define tempPin D4 // one wire pin; could use multiple in order to easily determine temp inputs
 
 const int num = 4; // NUMBER OF FANS? CONNECTED
@@ -262,6 +250,8 @@ void loop() {
 
     getTemp("all"); // also can enable timers.
 
+    tempChangeCheck(); // check if we need to change fan speed
+
     // this is working, so start skipping so we can do other work
     /*for(i = 0; i < num; i++) {
       counter_read_rpm(rpmPins[i]);
@@ -272,6 +262,8 @@ void loop() {
 
     Serial.println("DELAY");
     delay(interval);
+
+
 
     // int v = analogRead(A4);
     // v = v/16;
@@ -312,7 +304,7 @@ int setRpm(String args) {
     } else if( fan < 0 || fan > num ) {
       return -3;
     } else {
-      if( val > 35 && val < 255 )
+      if( val > 30 && val < 255 )
         analogWrite(pwmFans[fan], val, PWM_FREQ);
       else
         return -1;
@@ -321,4 +313,20 @@ int setRpm(String args) {
       return counter_read_rpm(rpmPins[fan]);
     }
     return -5;
+}
+
+int tempChangeOverride(String args) {
+  int pos = args.indexOf('=');
+  if( pos == -1 ) return -2;
+  String fan_s = args.substring(0, pos);
+  String val_s = args.substring(pos+1);
+  Serial.printlnf("tover fan_s: %s", fan_s.c_str());
+  Serial.printlnf("tover val_s: %s", val_s.c_str());
+  int fan = fan_s.toInt();
+  int val = val_s.toInt();
+  if( val == 0 )
+    tempChange[fan] = false;
+  else
+    tempChange[fan] = true;
+  return (int)tempChange[fan];
 }
