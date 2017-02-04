@@ -20,7 +20,7 @@ const int pwmFans[] = {RX, TX, D2, D3};
 const int rpmPins[] = {A0, A1, A2, A3};
 
 // use to auto change fan?
-bool doFanAutoTempChange = true;
+bool doFanAutoTempChange = false;
 double lowTemp[] = {30.0, 30.0, 30.0, 30.0};
 double highTemp[] = {48.0, 48.0, 48.0, 48.0};
 bool tempChange[] = {true, true, true, true}; // change fan with temp?
@@ -71,6 +71,7 @@ void setup() {
     Particle.function("gettemp", getTempApi);
     Particle.function("scantemp", getTemp);
     Particle.variable("temps", tempString);
+    Particle.function("tempoverride", tempChangeOverride);
     for(int i=0; i<num; i++) {
       pinMode(pwmFans[i], OUTPUT);
       pinMode(rpmPins[i], INPUT_PULLUP);
@@ -322,11 +323,16 @@ int tempChangeOverride(String args) {
   String val_s = args.substring(pos+1);
   Serial.printlnf("tover fan_s: %s", fan_s.c_str());
   Serial.printlnf("tover val_s: %s", val_s.c_str());
-  int fan = fan_s.toInt();
-  int val = val_s.toInt();
-  if( val == 0 )
-    tempChange[fan] = false;
-  else
-    tempChange[fan] = true;
-  return (int)tempChange[fan];
+  if( fan_s == "all" ) {
+    doFanAutoTempChange = val_s.toInt();
+    return doFanAutoTempChange;
+  } else {
+    int fan = fan_s.toInt();
+    int val = val_s.toInt();
+    if( val == 0 )
+      tempChange[fan] = false;
+    else
+      tempChange[fan] = true;
+    return (int)tempChange[fan];
+  }
 }
