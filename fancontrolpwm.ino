@@ -30,10 +30,8 @@ const int rpmMax = 252; // ~100% (put slightly lower in order to pwm?)
 double tempArry[4];
 // 62 = sheilded sensor, blue shrink wrap
 //194 = twisted pair, blue+, o/w data, b/w-
-//
-static constexpr int sensorTemp[] = {62, 194, 191, 97};
-
-//const int counter_interrupt_pin = rpmPin; // aka rpmPin
+//191 = short ~3" Purple+, blue data, green-
+static constexpr int sensorTemp[] = {62, 194, 191, 97}; //last byte of address for DS18b20's
 
 const int k_seconds_per_minute = 60;
 const int k_pulses_per_revolution = 2;
