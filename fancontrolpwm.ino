@@ -8,11 +8,6 @@
 long previousMillis = 0;
 long interval = 5000;
 
-// Used to debounce Button
-boolean button_was_pressed;
-unsigned long pulseDuration;
-unsigned long millisNow = 0;
-
 #define tempPin D4 // one wire pin; could use multiple in order to easily determine temp inputs
 
 const int num = 4; // NUMBER OF FANS? CONNECTED
@@ -33,7 +28,10 @@ const int rpmMax = 252; // ~100% (put slightly lower in order to pwm?)
 #define PWM_FREQ 25000
 
 double tempArry[4];
-static constexpr int sensorTemp[] = {62, 97, 191, 194};
+// 62 = sheilded sensor, blue shrink wrap
+//194 = twisted pair, blue+, o/w data, b/w-
+//
+static constexpr int sensorTemp[] = {62, 194, 191, 97};
 
 //const int counter_interrupt_pin = rpmPin; // aka rpmPin
 
@@ -46,6 +44,7 @@ String tempString = String("Call gettemp first");
 
 int tempChangeCheck() {
   if( !doFanAutoTempChange ) return 0;
+  Serial.println("Check Temp Fan Override");
   for(int i = 0; i < num; i++) {
     if(tempArry[i] > 20 ) {
       if(tempArry[i] >= highTemp[i] && tempChange[i]) {
@@ -146,7 +145,7 @@ int getTemp(String args) {
 				frac
 				);*/
 
-        sprintf(msg, "Sensor# %d (%02X %d) =  : %c%d.%04d\r\n",i+1,
+        sprintf(msg, "Sensor# (%02X %d) =  : %c%d.%04d - ",
           sensors[(i*OW_ROMCODE_SIZE)+0],
 				  sensors[(i*OW_ROMCODE_SIZE)+7],
 				  sign,
@@ -177,6 +176,7 @@ int getTemp(String args) {
             break;
         }
         //Serial.printf("float %d: ", item);
+        Serial.printlnf("Storing value in %d", item);
         tempArry[item] = retval;
         //Serial.println(retval);
 			}
