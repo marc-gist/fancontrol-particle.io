@@ -1,9 +1,21 @@
 // This #include statement was automatically added by the Particle IDE.
+#include "HttpClient.h"
+#include "application.h"
 #include "ds18x20.h"
 #include "onewire.h"
-
 // This #include statement was automatically added by the Particle IDE.
 #include "FreqPeriodCounter.h"
+
+HttpClient http;
+// Headers currently need to be set at init, useful for API keys etc.
+http_header_t headers[] = {
+    //  { "Content-Type", "application/json" },
+    //  { "Accept" , "application/json" },
+    { "Accept" , "*/*"},
+    { NULL, NULL } // NOTE: Always terminate headers will NULL
+};
+http_request_t request;
+http_response_t response;
 
 long previousMillis = 0;
 long interval = 5000;
@@ -62,10 +74,10 @@ int tempChangeCheck() {
   return 1;
 }
 
-
 void setup() {
     Particle.function("setrpm", setRpm);
-    Particle.function("gettemp", getTempApi);
+    //Particle.function("gettemp", getTempApi);
+    Particle.function("pubRpms", publishRPMs);
     Particle.function("scantemp", getTemp);
     Particle.variable("temps", tempString);
     Particle.function("tempoverride", tempChangeOverride);
@@ -333,4 +345,26 @@ int tempChangeOverride(String args) {
       tempChange[fan] = true;
     return (int)tempChange[fan];
   }
+}
+
+int publishRPMs(String args) {
+  int rpms[num];
+
+  for(int i=0; i<num; i++) {
+    rpms[i] = counter_read_rpm(rpmPins[i]);
+  }
+  String ret = String::format("[%d, %d, %d, %d]", rpms[0], rpms[1],rpms[2],rpms[3]);
+  Serial.println(ret);
+  Particle.publish("rpms", ret, 60, PRIVATE);
+  return 1;
+}
+
+void sendIoT() {
+  request.hostname = "10.2.1.233";
+  request.port = 80;
+  request.path = "/set?n=computer_temps&g=particle&v=" + String::format("[%f,%f,%f,%f]", tempArry[0], tempArry[1], tempArry[2], tempArry[3]);
+  http.get(request, response, headers);
+  Serial.print("IoT Response: ");
+  Serial.println(response.body);
+  return;
 }

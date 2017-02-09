@@ -1,6 +1,6 @@
 #ifndef FREQPERIODCOUNTER_H
 #define FREQPERIODCOUNTER_H
-
+#include "application.h"
 /* FreqPeriodCounter
  * Copyright (C) 2011  Albert van Dalen http://www.avdweb.nl
  * Modified by: marc-gist, mostly to allow a "rest" and reuse of the object
